@@ -1,23 +1,34 @@
 /******************************************************************************
-** Program name: Movie Files
+** Program name: Smallsh
 ** Author:       Huy Nguyen
 ** Date:         02/01/21
-** Description:  This program processes a file containing movie data chosen by
-**               the user. The movie titles will be added to .txt files based
-**               on the year the movie was released
+** Description:  This is an implementation of a small shell that contains a
+**               subset of features of well-known shells, such as bash.
 ******************************************************************************/
+#include <stdio.h>
 
 #define _GNU_SOURCE
-
-#include "menu.h"
-#include "get_int.h"
 
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
+void show_prompt()
+{
+    printf(": ");
+}
+
 int main(int argc, char *argv[])
 {
-    seed();
-    menu();
+    while (1) {
+        char input[255];
+        show_prompt();
+        fgets(input, 255, stdin);
+        // prompt
+        // get_command
+        // if parent
+        //   wait for child
+        // else
+        //   execute child command
+    }
     return EXIT_SUCCESS;
 }
