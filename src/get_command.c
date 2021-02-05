@@ -4,9 +4,17 @@
 
 #include "Command.h"
 
-#define MAX_ARGS 512
+#define MAX_ARGS 513
 
 
+/**
+ * @brief  Helper function that tokenizes a line into an array of strings
+ *         delimited by spaces.
+ * 
+ * @param  char *line: A line in the specified format.
+ * @param  char **tokens: Array of strings to store the tokens.
+ * @return void: None
+ */
 void tokenize_line(char *line, char **tokens)
 {
     // Get the first token.
@@ -27,7 +35,22 @@ void tokenize_line(char *line, char **tokens)
     }
 }
 
-void process_optional_commands(char **tokens, char **args, char *input, char *output, int *bg)
+/**
+ * @brief  Helper function that checks for optional commands given an array of
+ *         strings.
+ * 
+ * @param  char **tokens: Array of strings to process.
+ * @param  char **args: Array of strings to store optional args.
+ * @param  char **input: Address of a string to store optional input
+ *             redirection.
+ * @param  char **output: Address of a string to store optional output 
+ *             redirection.
+ * @param  int *output: Address of an int to store optional background process
+ *             command.
+ * @return void: None
+ */
+void process_optional_commands(char **tokens, char **args, char **input,
+    char **output, int *bg)
 {
     // tokens[0] was already processed, so start i at 1.
     int i = 1;
@@ -45,55 +68,24 @@ void process_optional_commands(char **tokens, char **args, char *input, char *ou
         i++;
     }
 
-    // Process optional input/output redirection and background process.
+    // Process optional input/output redirection and background process based
+    // on presence of special characters.
     while (tokens[i]) {
         if (strcmp(tokens[i], "<") == 0) {
             i++;
-            input = calloc(strlen(tokens[i]) + 1, sizeof(char));
-            strcpy(input, tokens[i]);
+            *input = calloc(strlen(tokens[i]) + 1, sizeof(char));
+            strcpy(*input, tokens[i]);
         }
         else if (strcmp(tokens[i], ">") == 0) {
             i++;
-            output = calloc(strlen(tokens[i]) + 1, sizeof(char));
-            strcpy(output, tokens[i]);
+            *output = calloc(strlen(tokens[i]) + 1, sizeof(char));
+            strcpy(*output, tokens[i]);
         }
         else if (strcmp(tokens[i], "&") == 0 && tokens[i + 1] == NULL) {
             *bg = 1;
         }
         i++;
     }
-}
-
-Command *get_command(char* line)
-{
-    char *tokens[MAX_ARGS + 1] = { NULL };
-    char *cmd = NULL, *input = NULL, *output = NULL;
-    char *args[MAX_ARGS] = { NULL };
-    int bg = 0;
-
-    tokenize_line(line, tokens);
-
-    if (!tokens[0]) {
-        return NULL;
-    }
-    cmd = calloc(strlen(tokens[0]) + 1, sizeof(char));
-    strcpy(cmd, tokens[0]);
-
-    process_optional_commands(tokens, args, input, output, &bg);
-
-    Command *command = command_create(cmd, args, input, output, bg);
-
-    free(cmd);
-    // if (input) { free(input); }
-    // if (output) { free(output); }
-    // for (int k = 0; k < i; k++) {
-    //     free(tokens[k]);
-    // }
-    // for (int l = 0; l < j; l++) {
-    //     free(args[l]);
-    // }
-
-    return command;
 }
 
 /**
@@ -106,69 +98,40 @@ Command *get_command(char* line)
  * @param  char* line: a line in the specified format.
  * @return Command*: Pointer to a constructed Command.
  */
-Command *get_command_old(char* line)
+Command *get_command(char* line)
 {
-    char *save_ptr;
-    char *cmd = NULL;
-    char *input = NULL;
-    char *output = NULL;
-    char *args[MAX_ARGS] = {NULL};
+    char *tokens[MAX_ARGS] = { NULL };
+    char *cmd = NULL, *input = NULL, *output = NULL;
+    char *args[MAX_ARGS] = { NULL };
     int bg = 0;
 
-    char *token = strtok_r(line, " \n", &save_ptr);
+    tokenize_line(line, tokens);
 
-    if (!token) {
+    // tokens[0] is the required command.
+    if (!tokens[0]) {
         return NULL;
     }
+    cmd = calloc(strlen(tokens[0]) + 1, sizeof(char));
+    strcpy(cmd, tokens[0]);
 
-    cmd = calloc(strlen(token) + 1, sizeof(char));
-    strcpy(cmd, token);
-
-    // Parse the args into an array.
-    int args_index = 0;
-    while (save_ptr
-            && save_ptr[0] != '&'
-            && args_index < MAX_ARGS
-            && !((save_ptr[0] == '<' || save_ptr[0] == '>') && save_ptr[1] == ' ')) {
-        token = strtok_r(NULL, " ", &save_ptr);
-        args[args_index] = calloc(strlen(token) + 1, sizeof(char));
-        strcpy(args[args_index], token);
-        args_index++;
-    }
-
-    // Get input redirection if it exists.
-    if (save_ptr && save_ptr[0] == '<') {
-        token = strtok_r(NULL, "< \n", &save_ptr);
-        printf("input token: %s\n", token);
-        input = calloc(strlen(token) + 1, sizeof(char));
-        strcpy(input, token);
-    }
-
-    // Get output redirection if it exists.
-    if (save_ptr && save_ptr[0] == '>') {
-        token = strtok_r(NULL, "> \n", &save_ptr);
-        printf("output token: %s\n", token);
-        output = calloc(strlen(token) + 1, sizeof(char));
-        strcpy(output, token);
-    }
-
-    // Get background command if it exists.
-    if (save_ptr && save_ptr[0] == '&') {
-        token = strtok_r(NULL, " \n", &save_ptr);
-        if (strcmp(token, "&") == 0) {
-            bg = 1;
-            printf("bg token found\n");
-        }
-    }
+    process_optional_commands(tokens, args, &input, &output, &bg);
 
     Command *command = command_create(cmd, args, input, output, bg);
 
     free(cmd);
     if (input) { free(input); }
     if (output) { free(output); }
-    for (int i = 0; i < args_index; i++) {
-        free(args[i]);
+    int i = 0, j = 0;
+
+    while (tokens[i] && i < MAX_ARGS) {
+        printf("%s\n", tokens[i]);
+        free(tokens[i]);
+        i++;
     }
-    
+    while (args[j] && j < MAX_ARGS) {
+        free(args[j]);
+        j++;
+    }
+
     return command;
 }

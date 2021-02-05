@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
             command_print(command);
         }
         free(current_line);
+        command_destroy(command);
     }
     return EXIT_SUCCESS;
 }
