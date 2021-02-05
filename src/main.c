@@ -6,6 +6,10 @@
 **               subset of features of well-known shells, such as bash.
 ******************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "Command.h"
+#include "get_command.h"
 
 #define _GNU_SOURCE
 
@@ -19,16 +23,24 @@ void show_prompt()
 
 int main(int argc, char *argv[])
 {
+
     while (1) {
-        char input[255];
-        show_prompt();
-        fgets(input, 255, stdin);
         // prompt
+        char *current_line = NULL;
+        size_t len = 0;
+
+        show_prompt();
+        getline(&current_line, &len, stdin);
         // get_command
+        Command *command = get_command(current_line);
         // if parent
         //   wait for child
         // else
         //   execute child command
+        if (command) {
+            command_print(command);
+        }
+        free(current_line);
     }
     return EXIT_SUCCESS;
 }
