@@ -38,19 +38,19 @@ int main(int argc, char *argv[])
         getline(&current_line, &len, stdin);
         // get_command
         Command *command = get_command(current_line, (int)pid);
-        // if parent
-        //   wait for child
-        // else
-        //   execute child command
-        // if (command) {
+
+        // if (command) { // TESTING
         //     command_print(command);
         // }
         if (!command) {
+            free(current_line);
             continue;
         } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
             // have a list of all child pids that are still running
             // loop through the list
             //   call kill and waitpid with WNOHANG for all items in it
+            free(current_line);
+            command_destroy(command);
             break;
         } else if (strcmp(command_get_cmd(command), CMD_CD) == 0) {
             // char cwd[256];
@@ -60,7 +60,17 @@ int main(int argc, char *argv[])
             printf("status running\n");
             perror("error: ");
         } else {
-            printf("# of args: %d\n", command_get_argc(command));
+            pid_t fork_pid = fork();
+            if (fork_pid < 0) {
+                perror("Fork failed");
+            }
+            if (fork_pid == 0) {
+                execvp(command_get_cmd(command), command_get_args(command));
+                perror("error: ");
+                exit(EXIT_FAILURE);
+            }
+            // printf("I am the parent.\n");
+            wait(NULL);
         }
 
         free(current_line);

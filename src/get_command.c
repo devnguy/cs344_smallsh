@@ -50,14 +50,15 @@ char *expand_string(char* str, char* repstr)
 
 /**
  * @brief  Helper function that tokenizes a line into an array of strings
- *         delimited by spaces.
+ *         delimited by spaces. Expands the string if an expansion variable is
+ *         found.
  * 
  * @param  char *line: A line in the specified format.
  * @param  char **tokens: Array of strings to store the tokens.
- * @param  char *expstr: Expansion string if EXP_VAR is found.
+ * @param  char *repstr: Replacement string if EXP_VAR is found in a token.
  * @return void: None
  */
-void tokenize_line(char *line, char **tokens, char *expstr)
+void tokenize_line(char *line, char **tokens, char *repstr)
 {
     // Get the first token.
     char *save_ptr;
@@ -71,7 +72,7 @@ void tokenize_line(char *line, char **tokens, char *expstr)
     int i = 0;
     while (token != NULL) {
         if (strstr(token, EXP_VAR)) {
-            tokens[i] = expand_string(token, expstr);
+            tokens[i] = expand_string(token, repstr);
         } else {
             tokens[i] = calloc(strlen(token) + 1, sizeof(char));
             strcpy(tokens[i], token);
@@ -99,8 +100,7 @@ void process_optional_commands(char **tokens, char **args, char **input,
     char **output, int *bg)
 {
     // tokens[0] was already processed, so start i at 1.
-    int i = 1;
-    int j = 0;
+    int i = 0;
 
     // Process optional args.
     while (tokens[i] 
@@ -108,9 +108,8 @@ void process_optional_commands(char **tokens, char **args, char **input,
             && strcmp(tokens[i], "<") != 0
             && strcmp(tokens[i], ">") != 0
             && strcmp(tokens[i], "&") != 0) {
-        args[j] = calloc(strlen(tokens[i]) + 1, sizeof(char));
-        strcpy(args[j], tokens[i]);
-        j++;
+        args[i] = calloc(strlen(tokens[i]) + 1, sizeof(char));
+        strcpy(args[i], tokens[i]);
         i++;
     }
 

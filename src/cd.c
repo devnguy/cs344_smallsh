@@ -15,13 +15,13 @@ void run_cd(Command *command)
 {
     int result;
     // chdir to HOME if no args.
-    if (!(command_get_args(command)[0])) {
+    if (!(command_get_args(command)[1])) {
         char *path = calloc(strlen(getenv("HOME")) + 1, sizeof(char));
         strcpy(path, getenv("HOME"));
         result = chdir(path);
         free(path);
     } else {
-        result = chdir(command_get_args(command)[0]);
+        result = chdir(command_get_args(command)[1]);
     }
 
     // TESTING

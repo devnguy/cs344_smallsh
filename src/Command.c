@@ -34,7 +34,7 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
 
     command->cmd = calloc(strlen(cmd) + 1, sizeof(char));
     strcpy(command->cmd, cmd);
-    command->argc = 1;
+    command->argc = 0;
 
     if (input) {
         command->input = calloc(strlen(input) + 1, sizeof(char));
