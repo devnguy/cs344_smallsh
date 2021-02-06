@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define MAX_ARGS 512
+#define MAX_ARGS 513
 
 struct command_t
 {
