@@ -11,6 +11,7 @@ struct command_t
     char *input;
     char *output;
     int bg;
+    int argc;
 };
 
 /**
@@ -33,10 +34,12 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
 
     command->cmd = calloc(strlen(cmd) + 1, sizeof(char));
     strcpy(command->cmd, cmd);
+    command->argc = 1;
 
     if (input) {
         command->input = calloc(strlen(input) + 1, sizeof(char));
         strcpy(command->input, input);
+        command->argc++;
     } else {
         command->input = NULL;
     }
@@ -44,6 +47,7 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
     if (output) {
         command->output = calloc(strlen(output) + 1, sizeof(char));
         strcpy(command->output, output);
+        command->argc++;
     } else {
         command->output = NULL;
     }
@@ -55,6 +59,7 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
             char *arg = calloc(strlen(args[i]) + 1, sizeof(char));
             strcpy(arg, args[i]);
             command->args[i] = arg;
+            command->argc++;
         } else {
             command->args[i] = NULL;
         }
@@ -130,4 +135,10 @@ int command_get_fg(struct command_t *command)
 char** command_get_args(struct command_t *command)
 {
     return command->args;
+}
+
+// Get method that returns the number of command args
+int command_get_argc(struct command_t *command)
+{
+    return command->argc;
 }

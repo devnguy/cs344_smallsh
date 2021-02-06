@@ -8,9 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "Command.h"
 #include "get_command.h"
+#include "cmd_constants.h"
+#include "cd.h"
 
 #define _GNU_SOURCE
 
@@ -39,13 +42,29 @@ int main(int argc, char *argv[])
         //   wait for child
         // else
         //   execute child command
-        if (command) {
-            command_print(command);
+        // if (command) {
+        //     command_print(command);
+        // }
+        if (!command) {
+            continue;
+        } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
+            // have a list of all child pids that are still running
+            // loop through the list
+            //   call kill and waitpid with WNOHANG for all items in it
+            break;
+        } else if (strcmp(command_get_cmd(command), CMD_CD) == 0) {
+            // char cwd[256];
+            // printf("%s\n", getcwd(cwd, 256));
+            run_cd(command);
+        } else if (strcmp(command_get_cmd(command), CMD_STATUS) == 0) {
+            printf("status running\n");
+            perror("error: ");
+        } else {
+            printf("# of args: %d\n", command_get_argc(command));
         }
+
         free(current_line);
-        if (command) {
-            command_destroy(command);
-        }
+        command_destroy(command);
     }
     return EXIT_SUCCESS;
 }
