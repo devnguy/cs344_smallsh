@@ -5,7 +5,48 @@
 #include "Command.h"
 
 #define MAX_ARGS 513
+#define EXP_VAR "$$"
 
+/**
+ * @brief  Checks a given string for the occurrence of EXP_VAR. If EXP_VAR is
+ *         found, replaces the occurrence with the given replacement string.
+ * 
+ * @param  char *str: Original string to check and expand.
+ * @param  char *repstr: Replacement string if occurrence is found.
+ * @return char *newstr: Address of newly allocated string. NULL if an
+ *         occurrence was not found.
+ */
+char *expand_string(char* str, char* repstr)
+{
+    if (!strstr(str, EXP_VAR)) {
+        return NULL;
+    }
+
+    char *expstr = NULL;
+    char temp[256];
+    strcpy(temp, str);
+
+    // Loop until every occurrence is replaced. temp initially holds str. In
+    // subsequent iterations, temp holds expstr to check if it still contains
+    // EXP_VAR.
+    do {
+        if (expstr) {
+            free(expstr);
+        }
+        char *occurrence = strstr(temp, EXP_VAR);
+        int index = occurrence - temp;
+
+        // Allocate and build the new expanded string.
+        expstr = calloc(strlen(temp) - strlen(EXP_VAR) + strlen(repstr) + 1,
+            sizeof(char));
+        strncpy(expstr, temp, index);
+        strcat(expstr, repstr);
+        strcat(expstr, &temp[index + strlen(EXP_VAR)]);
+        strcpy(temp, expstr);
+    } while (strstr(temp, EXP_VAR));
+
+    return expstr;
+}
 
 /**
  * @brief  Helper function that tokenizes a line into an array of strings
@@ -13,9 +54,10 @@
  * 
  * @param  char *line: A line in the specified format.
  * @param  char **tokens: Array of strings to store the tokens.
+ * @param  char *expstr: Expansion string if EXP_VAR is found.
  * @return void: None
  */
-void tokenize_line(char *line, char **tokens)
+void tokenize_line(char *line, char **tokens, char *expstr)
 {
     // Get the first token.
     char *save_ptr;
@@ -25,11 +67,15 @@ void tokenize_line(char *line, char **tokens)
         return;
     }
 
-    // Get the rest of the tokens.
+    // Get the rest of the tokens. Expand string if EXP_VAR is found.
     int i = 0;
     while (token != NULL) {
-        tokens[i] = calloc(strlen(token) + 1, sizeof(char));
-        strcpy(tokens[i], token);
+        if (strstr(token, EXP_VAR)) {
+            tokens[i] = expand_string(token, expstr);
+        } else {
+            tokens[i] = calloc(strlen(token) + 1, sizeof(char));
+            strcpy(tokens[i], token);
+        }
         token = strtok_r(NULL, " \n", &save_ptr);
         i++;
     }
@@ -96,16 +142,20 @@ void process_optional_commands(char **tokens, char **args, char **input,
  *         and constructs a Command with that data.
  * 
  * @param  char* line: a line in the specified format.
+ * @param  int pid: pid used for variable expansion.
  * @return Command*: Pointer to a constructed Command.
  */
-Command *get_command(char* line)
+Command *get_command(char* line, int pid)
 {
     char *tokens[MAX_ARGS] = { NULL };
     char *cmd = NULL, *input = NULL, *output = NULL;
     char *args[MAX_ARGS] = { NULL };
     int bg = 0;
 
-    tokenize_line(line, tokens);
+    char pidstr[11];
+    sprintf(pidstr, "%d", pid);
+
+    tokenize_line(line, tokens, pidstr);
 
     // tokens[0] is the required command.
     if (!tokens[0]) {
@@ -124,7 +174,6 @@ Command *get_command(char* line)
     int i = 0, j = 0;
 
     while (tokens[i] && i < MAX_ARGS) {
-        printf("%s\n", tokens[i]);
         free(tokens[i]);
         i++;
     }

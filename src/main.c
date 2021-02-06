@@ -7,6 +7,7 @@
 ******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "Command.h"
 #include "get_command.h"
@@ -28,11 +29,12 @@ int main(int argc, char *argv[])
         // prompt
         char *current_line = NULL;
         size_t len = 0;
+        pid_t pid = getpid();
 
         show_prompt();
         getline(&current_line, &len, stdin);
         // get_command
-        Command *command = get_command(current_line);
+        Command *command = get_command(current_line, (int)pid);
         // if parent
         //   wait for child
         // else

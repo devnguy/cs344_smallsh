@@ -3,6 +3,6 @@
 
 #include "Command.h"
 
-Command *get_command(char* line);
+Command *get_command(char* line, int pid);
 
 #endif
