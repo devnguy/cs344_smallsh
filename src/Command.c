@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define MAX_ARGS 513
 
@@ -12,6 +14,7 @@ struct command_t
     char *output;
     int bg;
     int argc;
+    int pid;
 };
 
 /**
@@ -27,7 +30,7 @@ struct command_t
  * @return Command*: Pointer to the constructed Command
  */
 struct command_t *command_create(char *cmd, char *args[], char *input, 
-    char *output, int bg)
+    char *output, int bg, int pid)
 {
     struct command_t *command = 
         (struct command_t*)malloc(sizeof(struct command_t));
@@ -53,6 +56,7 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
     }
 
     command->bg = bg;
+    command->pid = pid;
 
     for (int i = 0; i < MAX_ARGS; i++) {
         if (args[i]) {
@@ -68,6 +72,77 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
 }
 
 /**
+ * @brief  Changes the current working directory.
+ * 
+ * @param  Command *command: The command to execute.
+ * @return void
+ */
+void command_cd(struct command_t *command)
+{
+    int result;
+    // chdir to HOME if no args.
+    if (!(command->args[1])) {
+        char *path = calloc(strlen(getenv("HOME")) + 1, sizeof(char));
+        strcpy(path, getenv("HOME"));
+        result = chdir(path);
+        free(path);
+    } else {
+        result = chdir(command->args[1]);
+    }
+
+    if (result == -1) {
+        perror("Error");
+    }
+}
+
+/**
+ * @brief  Handles input/output redirection if provided and calls execvp.
+ *         *Note: Because execvp is called, the calling process will 
+ *                terminate on success.
+ * 
+ * @param  Command *command: The command to execute.
+ * @return void
+ */
+void command_exec(struct command_t *command)
+{
+    int src_fd;
+    int out_fd;
+    int result;
+
+    // Open source file if provided.
+    if (command->input) {
+        src_fd = open(command->input, O_RDONLY);
+        if (src_fd == -1) {
+            perror(command->input);
+            exit(EXIT_FAILURE);
+        }
+        // Redirect stdin to source file.
+        result = dup2(src_fd, 0);
+        if (result == -1) {
+            perror("dup2()");
+            exit(EXIT_FAILURE);
+        }
+    }
+    // Open output file if provided.
+    if (command->output) {
+        out_fd = open(command->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (out_fd == -1) {
+            perror(command->output);
+            exit(EXIT_FAILURE);
+        }
+        // Redirect stdout to output file.
+        result = dup2(out_fd, 1);
+        if (result == -1) {
+            perror("dup2()");
+            exit(EXIT_FAILURE);
+        }
+    }
+    execvp(command->cmd, command->args);
+    perror(command->cmd);
+    exit(EXIT_FAILURE);
+}
+
+/**
  * @brief  Prints the data members of the Command struct for testing.
  * 
  * @param  Command* command: Pointer to the command to display
@@ -76,8 +151,8 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
  */
 void command_print(struct command_t *command)
 {
-    printf("%s, %s, %s, %d\n", command->cmd, command->input, command->output,
-        command->bg);
+    printf("%s, %s, %s, %d, %d\n", command->cmd, command->input, command->output,
+        command->bg, command->pid);
 
     int i = 0;
     while (command->args[i] && i < MAX_ARGS) {
@@ -141,4 +216,16 @@ char** command_get_args(struct command_t *command)
 int command_get_argc(struct command_t *command)
 {
     return command->argc;
+}
+
+// Get method that returns the pid
+int command_get_pid(struct command_t *command)
+{
+    return command->pid;
+}
+
+// Set method that sets the pid
+void command_set_pid(struct command_t *command, int pid)
+{
+    command->pid = pid;
 }

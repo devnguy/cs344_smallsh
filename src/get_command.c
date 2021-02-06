@@ -165,7 +165,7 @@ Command *get_command(char* line, int pid)
 
     process_optional_commands(tokens, args, &input, &output, &bg);
 
-    Command *command = command_create(cmd, args, input, output, bg);
+    Command *command = command_create(cmd, args, input, output, bg, pid);
 
     free(cmd);
     if (input) { free(input); }

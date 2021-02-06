@@ -9,11 +9,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "Command.h"
+#include "Status.h"
 #include "get_command.h"
 #include "cmd_constants.h"
-#include "cd.h"
 
 #define _GNU_SOURCE
 
@@ -27,21 +28,19 @@ void show_prompt()
 
 int main(int argc, char *argv[])
 {
+    Status *status = status_create();
 
     while (1) {
-        // prompt
         char *current_line = NULL;
         size_t len = 0;
         pid_t pid = getpid();
 
         show_prompt();
         getline(&current_line, &len, stdin);
-        // get_command
         Command *command = get_command(current_line, (int)pid);
 
-        // if (command) { // TESTING
-        //     command_print(command);
-        // }
+        int child_status = 0;
+
         if (!command) {
             free(current_line);
             continue;
@@ -53,28 +52,33 @@ int main(int argc, char *argv[])
             command_destroy(command);
             break;
         } else if (strcmp(command_get_cmd(command), CMD_CD) == 0) {
-            // char cwd[256];
-            // printf("%s\n", getcwd(cwd, 256));
-            run_cd(command);
+            command_cd(command);
         } else if (strcmp(command_get_cmd(command), CMD_STATUS) == 0) {
-            printf("status running\n");
-            perror("error: ");
+            printf("exit value %d\n", status_get_status_no(status));
         } else {
             pid_t fork_pid = fork();
             if (fork_pid < 0) {
                 perror("Fork failed");
             }
+            // Child process.
             if (fork_pid == 0) {
-                execvp(command_get_cmd(command), command_get_args(command));
-                perror("error: ");
-                exit(EXIT_FAILURE);
+                command_exec(command);
             }
-            // printf("I am the parent.\n");
-            wait(NULL);
+            // Parent process.
+            fork_pid = waitpid(fork_pid, &child_status, 0);
+            if (WIFEXITED(child_status)) {
+                printf("child %d exited normally with status %d\n", fork_pid, WEXITSTATUS(child_status));
+                status_set_status_no(status, WEXITSTATUS(child_status));
+            } else {
+                printf("child %d exited abnormally with status %d\n", fork_pid, WTERMSIG(child_status));
+                status_set_status_no(status, WTERMSIG(child_status));
+            }
+            // status_set_status_no(status, child_status);
         }
 
         free(current_line);
         command_destroy(command);
     }
+    free(status);
     return EXIT_SUCCESS;
 }
