@@ -11,6 +11,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #include "Command.h"
 #include "Status.h"
@@ -29,17 +30,30 @@ void show_prompt()
     fflush(stdin);
 }
 
-void check_bg_pids(DynArr *bg_pids, int *status) {
+void check_bg_pids_status(DynArr *bg_pids, int *status) {
     int size = dynarr_get_size(bg_pids);
     int i = 0;
     while (i < size) {
         if (waitpid(dynarr_get_pos(bg_pids, i), status, WNOHANG)) {
             printf("background pid %d is done: exit value %d\n"
                 , dynarr_get_pos(bg_pids, i), WEXITSTATUS(*status));
-            printf("removing %d at %d\n", dynarr_get_pos(bg_pids, i), i);
             dynarr_remove(bg_pids, i);
             size = dynarr_get_size(bg_pids);
         } else {
+            i++;
+        }
+    }
+}
+
+void kill_bg_pids(DynArr *bg_pids, int *status) {
+    int size = dynarr_get_size(bg_pids);
+    int i = 0;
+    while (i < size) {
+        if (waitpid(dynarr_get_pos(bg_pids, i), status, WNOHANG)) {
+            dynarr_remove(bg_pids, i);
+            size = dynarr_get_size(bg_pids);
+        } else {
+            kill(dynarr_get_pos(bg_pids, i), SIGKILL);
             i++;
         }
     }
@@ -56,7 +70,7 @@ int main(int argc, char *argv[])
         pid_t pid = getpid();
         int child_status = 0;
 
-        check_bg_pids(bg_pids, &child_status);
+        check_bg_pids_status(bg_pids, &child_status);
         show_prompt();
         getline(&current_line, &len, stdin);
 
@@ -66,8 +80,7 @@ int main(int argc, char *argv[])
         if (!command) {
             continue;
         } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
-            // loop through the list
-            //   call kill and waitpid with WNOHANG for all items in it
+            kill_bg_pids(bg_pids, &child_status);
             command_destroy(command);
             break;
         } else if (strcmp(command_get_cmd(command), CMD_CD) == 0) {
@@ -113,3 +126,17 @@ int main(int argc, char *argv[])
     free(status);
     return EXIT_SUCCESS;
 }
+
+/**
+ * sigset_t
+ * declare a signal set. You can add and remove signals
+ * 
+ * sigaction allows registering sginal handling functions. Calling it "installs" the custom handler
+ * 
+ * sigaction(SIGTYPE, sigaction struct, sigaction struct optional)
+ * 
+ * sigaction(SIGINT, sigaction struct)
+ * sigaction(SIGSTP, sigaction struct) -> ignored by CHILD, custom handler in PARENT
+ * 
+ * define custom handler in sigaction struct
+ */

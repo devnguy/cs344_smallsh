@@ -110,6 +110,14 @@ void command_exec(struct command_t *command)
     int out_fd;
     int result;
 
+    // Redirect stdin/stdout to "/dev/null" for background processes.
+    if (command->bg && !command->input) {
+        command->input = "/dev/null";
+    }
+    if (command->bg && !command->output) {
+        command->output = "/dev/null";
+    }
+
     // Open source file if provided.
     if (command->input) {
         src_fd = open(command->input, O_RDONLY);
