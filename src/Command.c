@@ -98,7 +98,8 @@ void command_cd(struct command_t *command)
 /**
  * @brief  Handles input/output redirection if provided and calls execvp.
  *         *Note: Because execvp is called, the calling process will 
- *                terminate on success.
+ *                terminate on success. On error, this function returns so
+ *                error handling can be done by calling function.
  * 
  * @param  Command *command: The command to execute.
  * @return void
@@ -114,13 +115,13 @@ void command_exec(struct command_t *command)
         src_fd = open(command->input, O_RDONLY);
         if (src_fd == -1) {
             perror(command->input);
-            exit(EXIT_FAILURE);
+            return;
         }
         // Redirect stdin to source file.
         result = dup2(src_fd, 0);
         if (result == -1) {
             perror("dup2()");
-            exit(EXIT_FAILURE);
+            return;
         }
     }
     // Open output file if provided.
@@ -128,18 +129,17 @@ void command_exec(struct command_t *command)
         out_fd = open(command->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (out_fd == -1) {
             perror(command->output);
-            exit(EXIT_FAILURE);
+            return;
         }
         // Redirect stdout to output file.
         result = dup2(out_fd, 1);
         if (result == -1) {
             perror("dup2()");
-            exit(EXIT_FAILURE);
+            return;
         }
     }
     execvp(command->cmd, command->args);
     perror(command->cmd);
-    exit(EXIT_FAILURE);
 }
 
 /**
@@ -151,8 +151,8 @@ void command_exec(struct command_t *command)
  */
 void command_print(struct command_t *command)
 {
-    printf("%s, %s, %s, %d, %d\n", command->cmd, command->input, command->output,
-        command->bg, command->pid);
+    printf("%s, %s, %s, %d, %d\n", command->cmd, command->input, 
+        command->output, command->bg, command->pid);
 
     int i = 0;
     while (command->args[i] && i < MAX_ARGS) {
@@ -201,7 +201,7 @@ char* command_get_output(struct command_t *command)
 }
 
 // Get method that returns the command bg
-int command_get_fg(struct command_t *command)
+int command_get_bg(struct command_t *command)
 {
     return command->bg;
 }
