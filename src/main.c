@@ -30,11 +30,17 @@ void show_prompt()
 }
 
 void check_bg_pids(DynArr *bg_pids, int *status) {
-    for (int i = 0, size = dynarr_get_size(bg_pids); i < size; i++) {
+    int size = dynarr_get_size(bg_pids);
+    int i = 0;
+    while (i < size) {
         if (waitpid(dynarr_get_pos(bg_pids, i), status, WNOHANG)) {
             printf("background pid %d is done: exit value %d\n"
                 , dynarr_get_pos(bg_pids, i), WEXITSTATUS(*status));
+            printf("removing %d at %d\n", dynarr_get_pos(bg_pids, i), i);
             dynarr_remove(bg_pids, i);
+            size = dynarr_get_size(bg_pids);
+        } else {
+            i++;
         }
     }
 }
@@ -60,7 +66,6 @@ int main(int argc, char *argv[])
         if (!command) {
             continue;
         } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
-            // have a list of all child pids that are still running
             // loop through the list
             //   call kill and waitpid with WNOHANG for all items in it
             command_destroy(command);
@@ -77,6 +82,7 @@ int main(int argc, char *argv[])
             // Child process.
             if (fork_pid == 0) {
                 command_exec(command);
+                // This only runs if exec returned due to failure.
                 free(status);
                 command_destroy(command);
                 dynarr_destroy(bg_pids);
@@ -87,7 +93,7 @@ int main(int argc, char *argv[])
                 // background process
                 printf("background pid is %d\n", fork_pid);
                 dynarr_append(bg_pids, (int)fork_pid);
-                fork_pid = waitpid(fork_pid, &child_status, WNOHANG);
+                // fork_pid = waitpid(fork_pid, &child_status, WNOHANG);
             } else {
                 fork_pid = waitpid(fork_pid, &child_status, 0);
                 if (WIFEXITED(child_status)) {
