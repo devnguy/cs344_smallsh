@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <fcntl.h>
-#include <sys/wait.h>
 #include <signal.h>
 
 #include "Command.h"
@@ -25,12 +23,32 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
+/**
+ * @brief  Prints the shell prompt.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
 void show_prompt()
 {
     printf(": ");
     fflush(stdout);
 }
 
+/**
+ * @brief  Checks to see if currently running background processes have
+ *         finished and updates the status based on how the background process
+ *         ended.
+ * 
+ * @param  DynArr *bg_pids: Maintained array of pids of currently running
+ *         background processes.
+ * @param  int *child_status: Address to store child process status.
+ * @param  Status *status: Status to update based on child process 
+ *         termination.
+ * 
+ * @return void
+ */
 void check_bg_pids_status(DynArr *bg_pids, int *child_status, Status *status) {
     int size = dynarr_get_size(bg_pids);
     int i = 0;
@@ -53,6 +71,15 @@ void check_bg_pids_status(DynArr *bg_pids, int *child_status, Status *status) {
     }
 }
 
+/**
+ * @brief  Kills every background process that is currently running.
+ * 
+ * @param  DynArr *bg_pids: Maintained array of pids of currently running
+ *         background processes.
+ * @param  int *status: Address to store process status.
+ * 
+ * @return void
+ */
 void kill_bg_pids(DynArr *bg_pids, int *status) {
     int size = dynarr_get_size(bg_pids);
     int i = 0;
@@ -67,6 +94,11 @@ void kill_bg_pids(DynArr *bg_pids, int *status) {
     }
 }
 
+/**
+ * @brief  Gets a command from the user and dispatches it accordingly.
+ * 
+ * @return int: Exit status
+ */
 int main(int argc, char *argv[])
 {
     Status *status = status_create();
@@ -80,16 +112,26 @@ int main(int argc, char *argv[])
         size_t len = 0;
         pid_t pid = getpid();
         int child_status = 0;
-        
+        Command *command = NULL;
+
+        // Status is stored in sig_handlers.c as a global variable. Update
+        // that variable with each iteration.
         send_status_to_sig_handlers(status);
 
         check_bg_pids_status(bg_pids, &child_status, status);
-        show_prompt();
-        getline(&current_line, &len, stdin);
 
-        Command *command = get_command(current_line, (int)pid);
+        // Prompt for and get a command from user.
+        show_prompt();
+        int num_chars = getline(&current_line, &len, stdin);
+        if (num_chars == -1) {
+            clearerr(stdin);
+        }
+        if (current_line) {
+            command = get_command(current_line, (int)pid);
+        }
         free(current_line);
 
+        // Dispatch the given command.
         if (!command) {
             continue;
         } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
@@ -101,44 +143,10 @@ int main(int argc, char *argv[])
         } else if (strcmp(command_get_cmd(command), CMD_STATUS) == 0) {
             status_print(status);
         } else {
-            // command_print(command);
-            pid_t fork_pid = fork();
-            if (fork_pid < 0) {
-                perror("Fork failed");
-            }
-            // Child process.
-            if (fork_pid == 0) {
-                install_default_sigint_handler();
-                command_exec(command);
-                // This only runs if exec returned due to failure.
-                free(status);
-                command_destroy(command);
-                dynarr_destroy(bg_pids);
-                exit(EXIT_FAILURE);
-            }
-            // Parent process.
-            if (command_get_bg(command) && !status_get_is_in_fg_mode(status)) {
-                // background process
-                printf("background pid is %d\n", fork_pid);
-                fflush(stdout);
-                dynarr_append(bg_pids, (int)fork_pid);
-                // fork_pid = waitpid(fork_pid, &child_status, WNOHANG);
-            } else {
-                fork_pid = waitpid(fork_pid, &child_status, 0);
-                // printf("waitpid: %d, wifsignaled = %d\n", fork_pid, WIFSIGNALED(child_status));
-                if (WIFEXITED(child_status)) {
-                    // printf("child %d exited normally with status %d\n", fork_pid, WEXITSTATUS(child_status));
-                    status_set_status_no(status, WEXITSTATUS(child_status));
-                } else {
-                    // printf("child %d exited abnormally with status %d\n", fork_pid, WTERMSIG(child_status));
-                    status_set_status_no(status, WTERMSIG(child_status));
-                    status_print(status);
-                }
-            }
-            // status_set_status_no(status, child_status);
+            command_fork(command, status, bg_pids, &child_status);
         }
-
         command_destroy(command);
+        command = NULL;
     }
     dynarr_destroy(bg_pids);
     free(status);

@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "Command.h"
+#include "DynArr.h"
 #include "sig_handlers.h"
 
 #define MAX_ARGS 513
@@ -77,6 +79,7 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
  * @brief  Changes the current working directory.
  * 
  * @param  Command *command: The command to execute.
+ * 
  * @return void
  */
 void command_cd(struct command_t *command)
@@ -104,6 +107,7 @@ void command_cd(struct command_t *command)
  *                error handling can be done by calling function.
  * 
  * @param  Command *command: The command to execute.
+ * 
  * @return void
  */
 void command_exec(struct command_t *command)
@@ -150,6 +154,59 @@ void command_exec(struct command_t *command)
     }
     execvp(command->cmd, command->args);
     perror(command->cmd);
+}
+
+/**
+ * @brief  Driver function that handles forking to execute a shell command,
+ *         monitoring the forked child process, delegating processes to
+ *         foreground/background, and updating status. This function does too
+ *         much and has too many dependencies.
+ * 
+ * @param  Command *command: Pointer to the command to display
+ * @param  Status *status: Pointer to the status to maintain
+ * @param  DynArr *bg_pids: Array of pids that are currently running in the bg
+ * @param  int *child_status: Address to store child process status
+ * 
+ * @return void
+ */
+void command_fork(struct command_t *command, Status *status, DynArr *bg_pids, 
+    int *child_status) 
+{
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
+        perror("Fork failed");
+    }
+    // Child process.
+    if (fork_pid == 0) {
+        ignore_sigtstp();
+        if (command->bg) {
+            ignore_sigint();
+        } else {
+            install_default_sigint_handler();
+        }
+        command_exec(command);
+        // This only runs if exec returned due to failure.
+        free(status);
+        command_destroy(command);
+        dynarr_destroy(bg_pids);
+        exit(EXIT_FAILURE);
+    }
+    // Parent process.
+    if (command->bg && !status_get_is_in_fg_mode(status)) {
+        // background process
+        printf("background pid is %d\n", fork_pid);
+        fflush(stdout);
+        dynarr_append(bg_pids, (int)fork_pid);
+        // fork_pid = waitpid(fork_pid, &child_status, WNOHANG);
+    } else {
+        fork_pid = waitpid(fork_pid, child_status, 0);
+        if (WIFEXITED(*child_status)) {
+            status_set_status_no(status, WEXITSTATUS(*child_status));
+        } else {
+            status_set_status_no(status, WTERMSIG(*child_status));
+            status_print(status);
+        }
+    }
 }
 
 /**

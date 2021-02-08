@@ -4,10 +4,32 @@
 #include <stdio.h>
 
 #include "Status.h"
+#include "sig_handlers.h"
 
-int child_pid = 0;
 Status *status = NULL;
 
+/**
+ * @brief  A hacky workaround that allows a signal handler to have access to
+ *         a maintained Status. This is due to custom signal handlers being
+ *         unable to take additional params.
+ * 
+ * @param  Status *new_status: The new status to replace the current global 
+ *         variable.
+ * 
+ * @return void
+ */
+void send_status_to_sig_handlers(Status *new_status)
+{
+    status = new_status;
+}
+
+/**
+ * @brief  Calls sigaction to ignore SIGINT.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
 void ignore_sigint()
 {
     struct sigaction ignore_action = {0};
@@ -15,14 +37,27 @@ void ignore_sigint()
     sigaction(SIGINT, &ignore_action, NULL);
 }
 
-void handle_sigint(int signo)
+/**
+ * @brief  Calls sigaction to ignore SIGTSTP.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
+void ignore_sigtstp()
 {
-    // char *message = "Caught SIGINT\n";
-    // write(STDOUT_FILENO, message, 14);
-    // printf("caught sigint. killing %d\n", child_pid);
-    kill(child_pid, SIGINT);
+    struct sigaction ignore_action = {0};
+    ignore_action.sa_handler = SIG_IGN;
+    sigaction(SIGTSTP, &ignore_action, NULL);
 }
 
+/**
+ * @brief  Calls sigaction to set the SIGINT signal handler back to default.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
 void install_default_sigint_handler()
 {
     struct sigaction default_action = {0};
@@ -30,27 +65,30 @@ void install_default_sigint_handler()
     sigaction(SIGINT, &default_action, NULL);
 }
 
-void init_sigint_handler(int pid)
+/**
+ * @brief  Calls sigaction to set the SIGTSTP signal handler to a custom
+ *         function.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
+void install_sgtstp_handler()
 {
-    child_pid = pid;
-    struct sigaction sigint_action = {0};
-    sigint_action.sa_handler = handle_sigint;
-    sigaction(SIGINT, &sigint_action, NULL);
+    struct sigaction sa_sigtstp = {0};
+    sa_sigtstp.sa_handler = sigtstp_handler;
+    sigfillset(&sa_sigtstp.sa_mask);
+    sigaction(SIGTSTP, &sa_sigtstp, NULL);
 }
 
-
-
-
-
-
-
-// A hack work-around function because args cannot be passed to custom signal
-// handler. Update the status global variable.
-void send_status_to_sig_handlers(Status *new_status)
-{
-    status = new_status;
-}
-
+/**
+ * @brief  Custom SIGTSTP handler that toggles foreground-only mode status.
+ *         Accesses and modifies the global "status" variable.
+ * 
+ * @param  None
+ * 
+ * @return void
+ */
 void sigtstp_handler()
 {
     if (!status_get_is_in_fg_mode(status)) {
@@ -66,10 +104,3 @@ void sigtstp_handler()
     }
 }
 
-void install_sgtstp_handler()
-{
-    struct sigaction sa_sigtstp = {0};
-    sa_sigtstp.sa_handler = sigtstp_handler;
-    sigfillset(&sa_sigtstp.sa_mask);
-    sigaction(SIGTSTP, &sa_sigtstp, NULL);
-}
