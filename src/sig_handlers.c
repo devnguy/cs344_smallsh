@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <sys/wait.h>
 
 #include "Status.h"
 #include "sig_handlers.h"
@@ -9,7 +10,7 @@
 Status *status = NULL;
 
 /**
- * @brief  A hacky workaround that allows a signal handler to have access to
+ * @brief  A hacky workaround that allows a signal handler to gain access to
  *         a maintained Status. This is due to custom signal handlers being
  *         unable to take additional params.
  * 

@@ -77,32 +77,54 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
 }
 
 /**
- * @brief  Changes the current working directory.
+ * @brief  Driver function that handles forking to execute a shell command,
+ *         monitoring the forked child process, delegating processes to
+ *         foreground/background, and updating status. This function does too
+ *         much and has too many dependencies.
  * 
- * @param  Command *command: The command to execute.
+ * @param  Command *command: Pointer to the command to display
+ * @param  Status *status: Pointer to the status to maintain
+ * @param  DynArr *bg_pids: Array of pids that are currently running in the bg
  * 
  * @return void
  */
-void command_cd(struct command_t *command)
+void command_fork(struct command_t *command, Status *status, DynArr *bg_pids) 
 {
-    int result;
-    // chdir to HOME if no args.
-    if (!(command->args[1])) {
-        char *path = calloc(strlen(getenv("HOME")) + 1, sizeof(char));
-        strcpy(path, getenv("HOME"));
-        result = chdir(path);
-        free(path);
-    } else {
-        result = chdir(command->args[1]);
+    int *child_status_ptr = status_get_child_status_ptr(status);
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
+        perror("fork()");
     }
-
-    if (result == -1) {
-        perror("Error");
+    // Configure child process signal handling before executing. Process will
+    // exit due to exec or exit function.
+    if (fork_pid == 0) {
+        ignore_sigtstp();
+        if (command->bg) {
+            ignore_sigint();
+        } else {
+            install_default_sigint_handler();
+        }
+        command_exec(command);
+        // Clean up before exiting if exec returned due to some failure.
+        free(status);
+        command_destroy(command);
+        dynarr_destroy(bg_pids);
+        exit(EXIT_FAILURE);
+    }
+    // Background process. waitpid will be called with WNOHANG on bg_pids
+    // before next prompt.
+    if (command->bg && !status_get_is_in_fg_mode(status)) {
+        printf("background pid is %d\n", fork_pid);
+        fflush(stdout);
+        dynarr_append(bg_pids, (int)fork_pid);
+    // Wait for foreground child process.
+    } else {
+        command_resolve_process(&fork_pid, status);
     }
 }
 
 /**
- * @brief  Handles input/output redirection if provided and calls execvp.
+ * @brief  Handles input/output redirection if provided before calling execvp.
  *         *Note: Because execvp is called, the calling process will 
  *                terminate on success. On error, this function returns so
  *                error handling can be done by calling function.
@@ -157,52 +179,6 @@ void command_exec(struct command_t *command)
     perror(command->cmd);
 }
 
-/**
- * @brief  Driver function that handles forking to execute a shell command,
- *         monitoring the forked child process, delegating processes to
- *         foreground/background, and updating status. This function does too
- *         much and has too many dependencies.
- * 
- * @param  Command *command: Pointer to the command to display
- * @param  Status *status: Pointer to the status to maintain
- * @param  DynArr *bg_pids: Array of pids that are currently running in the bg
- * @param  int *child_status: Address to store child process status
- * 
- * @return void
- */
-void command_fork(struct command_t *command, Status *status, DynArr *bg_pids) 
-{
-    int *child_status_ptr = status_get_child_status_ptr(status);
-    pid_t fork_pid = fork();
-    if (fork_pid < 0) {
-        perror("Fork failed");
-    }
-    // Child process.
-    if (fork_pid == 0) {
-        ignore_sigtstp();
-        if (command->bg) {
-            ignore_sigint();
-        } else {
-            install_default_sigint_handler();
-        }
-        command_exec(command);
-        // This only runs if exec returned due to failure.
-        free(status);
-        command_destroy(command);
-        dynarr_destroy(bg_pids);
-        exit(EXIT_FAILURE);
-    }
-    // Background process. waitpid will be called with WNOHANG on bg_pids
-    // before next prompt.
-    if (command->bg && !status_get_is_in_fg_mode(status)) {
-        printf("background pid is %d\n", fork_pid);
-        fflush(stdout);
-        dynarr_append(bg_pids, (int)fork_pid);
-    // Wait for parent process.
-    } else {
-        command_resolve_process(&fork_pid, status);
-    }
-}
 
 /**
  * @brief  Takes a process id and waits for it to terminate. Updates the
@@ -218,16 +194,41 @@ void command_resolve_process(int *pid, Status *status)
     int *child_status_ptr = status_get_child_status_ptr(status);
 
     // During waitpid, SIGTSTP signal can be sent to foreground process. 
-    // Sending status to sig handlers allows the handler to know which process
-    // to continue to wait on.
+    // Updating the child pid allows the handler to know which process to
+    // continue to wait on.
     status_set_child_pid(status, *pid);
-    send_status_to_sig_handlers(status);
     *pid = waitpid(*pid, child_status_ptr, 0);
+
     if (WIFEXITED(*child_status_ptr)) {
         status_set_status_no(status, WEXITSTATUS(*child_status_ptr));
     } else {
         status_set_status_no(status, WTERMSIG(*child_status_ptr));
         status_print(status);
+    }
+}
+
+/**
+ * @brief  Changes the current working directory.
+ * 
+ * @param  Command *command: The command to execute.
+ * 
+ * @return void
+ */
+void command_cd(struct command_t *command)
+{
+    int result;
+    // chdir to HOME if no args.
+    if (!(command->args[1])) {
+        char *path = calloc(strlen(getenv("HOME")) + 1, sizeof(char));
+        strcpy(path, getenv("HOME"));
+        result = chdir(path);
+        free(path);
+    } else {
+        result = chdir(command->args[1]);
+    }
+
+    if (result == -1) {
+        perror("Error");
     }
 }
 

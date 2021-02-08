@@ -44,7 +44,6 @@ void show_prompt()
  * 
  * @param  DynArr *bg_pids: Maintained array of pids of currently running
  *         background processes.
- * @param  int *child_status: Address to store child process status.
  * @param  Status *status: Status to update based on child process 
  *         termination.
  * 
@@ -78,7 +77,7 @@ void check_bg_pids_status(DynArr *bg_pids, Status *status) {
  * 
  * @param  DynArr *bg_pids: Maintained array of pids of currently running
  *         background processes.
- * @param  int *status: Address to store process status.
+ * @param  Status *status: Status struct to update.
  * 
  * @return void
  */
@@ -107,6 +106,8 @@ int main(int argc, char *argv[])
     Status *status = status_create();
     DynArr *bg_pids = dynarr_create(10);
 
+    // Status is stored in sig_handlers.c as a global variable.
+    send_status_to_sig_handlers(status);
     ignore_sigint();
     install_sigtstp_handler();
 
@@ -114,10 +115,6 @@ int main(int argc, char *argv[])
         char *current_line = NULL;
         size_t len = 0;
         pid_t pid = getpid();
-
-        // Status is stored in sig_handlers.c as a global variable. Update
-        // that variable with each iteration.
-        send_status_to_sig_handlers(status);
 
         check_bg_pids_status(bg_pids, status);
 
@@ -142,7 +139,6 @@ int main(int argc, char *argv[])
             command_fork(command, status, bg_pids);
         }
         command_destroy(command);
-        command = NULL;
     }
     dynarr_destroy(bg_pids);
     free(status);
