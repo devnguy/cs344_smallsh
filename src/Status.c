@@ -12,7 +12,7 @@ struct status_t
  * 
  * @param  None
  * 
- * @return Command*: Pointer to the constructed Command
+ * @return Status*: Pointer to the constructed Status
  */
 struct status_t *status_create()
 {
