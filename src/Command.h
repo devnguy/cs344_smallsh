@@ -9,8 +9,8 @@ struct command_t *command_create(char *cmd, char *args[], char *input,
     char *output, int bg, int pid);
 void command_cd(Command *command);
 void command_exec(Command *command);
-void command_fork(Command *command, Status *status, DynArr *bg_pids,
-    int *child_status);
+void command_fork(Command *command, Status *status, DynArr *bg_pids);
+void command_resolve_process(int *pid, Status *status);
 void command_print(Command *command);
 void command_destroy(Command *command);
 

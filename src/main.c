@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/wait.h>
 
 #include "Command.h"
 #include "Status.h"
@@ -49,9 +50,10 @@ void show_prompt()
  * 
  * @return void
  */
-void check_bg_pids_status(DynArr *bg_pids, int *child_status, Status *status) {
+void check_bg_pids_status(DynArr *bg_pids, Status *status) {
     int size = dynarr_get_size(bg_pids);
     int i = 0;
+    int *child_status = status_get_child_status_ptr(status);
     while (i < size) {
         if (waitpid(dynarr_get_pos(bg_pids, i), child_status, WNOHANG)) {
             printf("background pid %d is done: ", dynarr_get_pos(bg_pids, i));
@@ -80,11 +82,12 @@ void check_bg_pids_status(DynArr *bg_pids, int *child_status, Status *status) {
  * 
  * @return void
  */
-void kill_bg_pids(DynArr *bg_pids, int *status) {
+void kill_bg_pids(DynArr *bg_pids, Status *status) {
+    int *child_status_ptr = status_get_child_status_ptr(status);
     int size = dynarr_get_size(bg_pids);
     int i = 0;
     while (i < size) {
-        if (waitpid(dynarr_get_pos(bg_pids, i), status, WNOHANG)) {
+        if (waitpid(dynarr_get_pos(bg_pids, i), child_status_ptr, WNOHANG)) {
             dynarr_remove(bg_pids, i);
             size = dynarr_get_size(bg_pids);
         } else {
@@ -105,37 +108,30 @@ int main(int argc, char *argv[])
     DynArr *bg_pids = dynarr_create(10);
 
     ignore_sigint();
-    install_sgtstp_handler();
+    install_sigtstp_handler();
 
     while (1) {
         char *current_line = NULL;
         size_t len = 0;
         pid_t pid = getpid();
-        int child_status = 0;
-        Command *command = NULL;
 
         // Status is stored in sig_handlers.c as a global variable. Update
         // that variable with each iteration.
         send_status_to_sig_handlers(status);
 
-        check_bg_pids_status(bg_pids, &child_status, status);
+        check_bg_pids_status(bg_pids, status);
 
         // Prompt for and get a command from user.
         show_prompt();
-        int num_chars = getline(&current_line, &len, stdin);
-        if (num_chars == -1) {
-            clearerr(stdin);
-        }
-        if (current_line) {
-            command = get_command(current_line, (int)pid);
-        }
+        getline(&current_line, &len, stdin);
+        Command *command = get_command(current_line, (int)pid);
         free(current_line);
 
         // Dispatch the given command.
         if (!command) {
             continue;
         } else if (strcmp(command_get_cmd(command), CMD_EXIT) == 0) {
-            kill_bg_pids(bg_pids, &child_status);
+            kill_bg_pids(bg_pids, status);
             command_destroy(command);
             break;
         } else if (strcmp(command_get_cmd(command), CMD_CD) == 0) {
@@ -143,7 +139,7 @@ int main(int argc, char *argv[])
         } else if (strcmp(command_get_cmd(command), CMD_STATUS) == 0) {
             status_print(status);
         } else {
-            command_fork(command, status, bg_pids, &child_status);
+            command_fork(command, status, bg_pids);
         }
         command_destroy(command);
         command = NULL;

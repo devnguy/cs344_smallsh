@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "Command.h"
 #include "DynArr.h"
@@ -169,9 +170,9 @@ void command_exec(struct command_t *command)
  * 
  * @return void
  */
-void command_fork(struct command_t *command, Status *status, DynArr *bg_pids, 
-    int *child_status) 
+void command_fork(struct command_t *command, Status *status, DynArr *bg_pids) 
 {
+    int *child_status_ptr = status_get_child_status_ptr(status);
     pid_t fork_pid = fork();
     if (fork_pid < 0) {
         perror("Fork failed");
@@ -191,21 +192,42 @@ void command_fork(struct command_t *command, Status *status, DynArr *bg_pids,
         dynarr_destroy(bg_pids);
         exit(EXIT_FAILURE);
     }
-    // Parent process.
+    // Background process. waitpid will be called with WNOHANG on bg_pids
+    // before next prompt.
     if (command->bg && !status_get_is_in_fg_mode(status)) {
-        // background process
         printf("background pid is %d\n", fork_pid);
         fflush(stdout);
         dynarr_append(bg_pids, (int)fork_pid);
-        // fork_pid = waitpid(fork_pid, &child_status, WNOHANG);
+    // Wait for parent process.
     } else {
-        fork_pid = waitpid(fork_pid, child_status, 0);
-        if (WIFEXITED(*child_status)) {
-            status_set_status_no(status, WEXITSTATUS(*child_status));
-        } else {
-            status_set_status_no(status, WTERMSIG(*child_status));
-            status_print(status);
-        }
+        command_resolve_process(&fork_pid, status);
+    }
+}
+
+/**
+ * @brief  Takes a process id and waits for it to terminate. Updates the
+ *         status based on how the process terminated.
+ * 
+ * @param  int *pid: pid to wait on
+ * @param  Status *status: The Status struct to update.
+ * 
+ * @return void
+ */
+void command_resolve_process(int *pid, Status *status)
+{
+    int *child_status_ptr = status_get_child_status_ptr(status);
+
+    // During waitpid, SIGTSTP signal can be sent to foreground process. 
+    // Sending status to sig handlers allows the handler to know which process
+    // to continue to wait on.
+    status_set_child_pid(status, *pid);
+    send_status_to_sig_handlers(status);
+    *pid = waitpid(*pid, child_status_ptr, 0);
+    if (WIFEXITED(*child_status_ptr)) {
+        status_set_status_no(status, WEXITSTATUS(*child_status_ptr));
+    } else {
+        status_set_status_no(status, WTERMSIG(*child_status_ptr));
+        status_print(status);
     }
 }
 

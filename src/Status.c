@@ -5,6 +5,8 @@ struct status_t
 {
     int status_no;
     int is_in_fg_mode;
+    int child_status;
+    int child_pid;
 };
 
 /**
@@ -20,6 +22,8 @@ struct status_t *status_create()
         (struct status_t*)malloc(sizeof(struct status_t));
     status->status_no = 0;
     status->is_in_fg_mode = 0;
+    status->child_status = 0;
+    status->child_pid = 0;
     return status;
 }
 
@@ -68,4 +72,28 @@ void status_enable_fg_mode(struct status_t *status)
 void status_disable_fg_mode(struct status_t *status)
 {
     status->is_in_fg_mode = 0;
+}
+
+// Returns the address of the child_status.
+int *status_get_child_status_ptr(struct status_t *status)
+{
+    return &status->child_status;
+}
+
+// Returns the child_status.
+int status_get_child_status(struct status_t *status)
+{
+    return status->child_status;
+}
+
+// Returns the child_pid.
+int status_get_child_pid(struct status_t *status)
+{
+    return status->child_pid;
+}
+
+// Sets the child_pid.
+void status_set_child_pid(struct status_t *status, int child_pid)
+{
+    status->child_pid = child_pid;
 }

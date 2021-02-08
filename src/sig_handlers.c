@@ -73,17 +73,18 @@ void install_default_sigint_handler()
  * 
  * @return void
  */
-void install_sgtstp_handler()
+void install_sigtstp_handler()
 {
     struct sigaction sa_sigtstp = {0};
     sa_sigtstp.sa_handler = sigtstp_handler;
-    sigfillset(&sa_sigtstp.sa_mask);
+    sa_sigtstp.sa_flags = SA_RESTART;
     sigaction(SIGTSTP, &sa_sigtstp, NULL);
 }
 
 /**
  * @brief  Custom SIGTSTP handler that toggles foreground-only mode status.
- *         Accesses and modifies the global "status" variable.
+ *         Accesses and modifies the global "status" variable. This function
+ *         will wait for the pid stored in status.
  * 
  * @param  None
  * 
@@ -91,16 +92,18 @@ void install_sgtstp_handler()
  */
 void sigtstp_handler()
 {
+    waitpid(status_get_child_pid(status), 
+        status_get_child_status_ptr(status), 0);
     if (!status_get_is_in_fg_mode(status)) {
         status_enable_fg_mode(status);
-        char *message = "\nEntering foreground-only mode (& is now ignored)\n";
-        write(STDOUT_FILENO, message, 50);
-        fflush(stdout);
+        char *message = 
+            "\nEntering foreground-only mode (& is now ignored)\n: ";
+        write(STDOUT_FILENO, message, 52);
     } else {
         status_disable_fg_mode(status);
-        char *message = "\nExiting foreground-only mode\n";
-        write(STDOUT_FILENO, message, 30);
-        fflush(stdout);
+        char *message = "\nExiting foreground-only mode\n: ";
+        write(STDOUT_FILENO, message, 32);
     }
+    fflush(stdout);
 }
 
