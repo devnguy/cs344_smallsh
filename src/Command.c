@@ -212,7 +212,7 @@ void command_fork(struct command_t *command, Status *status, DynArr *bg_pids,
 /**
  * @brief  Prints the data members of the Command struct for testing.
  * 
- * @param  Command* command: Pointer to the command to display
+ * @param  Command *command: Pointer to the command to display
  * 
  * @return void
  */
@@ -232,7 +232,7 @@ void command_print(struct command_t *command)
 /**
  * @brief  Frees the allocated memory of the Command.
  * 
- * @param  Command* command: Pointer to the command to free.
+ * @param  Command *command: Pointer to the command to free.
  * 
  * @return void
  */
