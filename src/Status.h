@@ -2,8 +2,12 @@
 #define STATUS_H
 
 typedef struct status_t Status;
-struct status_t *status_create();
-int status_get_status_no(struct status_t *status);
-void status_set_status_no(struct status_t *status, int status_no);
+Status *status_create();
+void status_print(Status *status);
+int status_get_status_no(Status *status);
+void status_set_status_no(Status *status, int status_no);
+int status_get_is_in_fg_mode(Status *status);
+void status_enable_fg_mode(Status *status);
+void status_disable_fg_mode(Status *status);
 
 #endif

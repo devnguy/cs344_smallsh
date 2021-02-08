@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "sig_handlers.h"
+
 #define MAX_ARGS 513
 
 struct command_t
@@ -134,7 +136,7 @@ void command_exec(struct command_t *command)
     }
     // Open output file if provided.
     if (command->output) {
-        out_fd = open(command->output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        out_fd = open(command->output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (out_fd == -1) {
             perror(command->output);
             return;

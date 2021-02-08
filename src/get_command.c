@@ -99,7 +99,6 @@ void tokenize_line(char *line, char **tokens, char *repstr)
 void process_optional_commands(char **tokens, char **args, char **input,
     char **output, int *bg)
 {
-    // tokens[0] was already processed, so start i at 1.
     int i = 0;
 
     // Process optional args.
@@ -134,7 +133,7 @@ void process_optional_commands(char **tokens, char **args, char **input,
 }
 
 /**
- * @brief  Takes a line from in the format: 
+ * @brief  Takes a line in the format: 
  * 
  *         command [arg1 arg2 ...] [< input_file] [> output_file] [&]
  * 
